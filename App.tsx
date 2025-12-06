@@ -18,7 +18,8 @@ const ProtectedLayout: React.FC<{
   theme: 'light'|'dark'; 
   toggleTheme: () => void; 
   onLogout: () => void;
-}> = ({ isAdminMode, theme, toggleTheme, onLogout }) => {
+  onSecretTap: () => void; // Nueva prop para el toque secreto
+}> = ({ isAdminMode, theme, toggleTheme, onLogout, onSecretTap }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -41,8 +42,12 @@ const ProtectedLayout: React.FC<{
             >
               <Menu size={24} />
             </button>
-            <h2 className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[200px] md:max-w-none">
-              {isAdminMode ? <span className="text-red-600 font-bold tracking-wider text-xs md:text-base">[ ROOT MODE ]</span> : 'Panel Empresarial'}
+            {/* AQUÍ ESTÁ EL TRUCO PARA CELULAR: onClick={onSecretTap} */}
+            <h2 
+              onClick={onSecretTap}
+              className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[200px] md:max-w-none select-none cursor-pointer active:scale-95 transition-transform"
+            >
+              {isAdminMode ? <span className="text-red-600 font-bold tracking-wider text-xs md:text-base">[ ROOT MODE ACTIVE ]</span> : 'Panel Empresarial'}
             </h2>
           </div>
           <div className="flex items-center gap-3 md:gap-4">
@@ -63,26 +68,66 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  // Estado para contar toques en celular
+  const [tapCount, setTapCount] = useState(0);
+
+  // Referencia para el estado actual de admin dentro del listener
+  const [adminRef, setAdminRef] = useState(false);
 
   useEffect(() => {
     const loggedIn = localStorage.getItem('ilealtad_auth') === 'true';
     setIsAuthenticated(loggedIn);
+    // IMPORTANTE: Siempre iniciar en falso por seguridad
+    setIsAdminMode(false); 
 
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+  }, [theme]);
 
+  useEffect(() => {
+    setAdminRef(isAdminMode);
+  }, [isAdminMode]);
+
+  // Función para activar admin (usada por Teclado y por Toques)
+  const toggleAdminAuth = () => {
+    if (adminRef) {
+      setIsAdminMode(false);
+      alert('Modo Administrador DESACTIVADO');
+    } else {
+      const pass = window.prompt("⚠️ ACCESO RESTRINGIDO ⚠️\nIngrese clave de administrador:");
+      if (pass === 'mela1234') {
+        setIsAdminMode(true);
+        alert('✅ Modo Administrador ACTIVADO');
+      } else {
+        alert('⛔ Contraseña Incorrecta');
+      }
+    }
+    setTapCount(0); // Reiniciar contador
+  };
+
+  // Listener para PC (Alt + 1)
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && e.key === '1') {
-        setIsAdminMode(prev => !prev);
+        toggleAdminAuth();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [theme]);
+  }, [adminRef]); 
+
+  // Handler para Celular (5 toques seguidos)
+  const handleSecretTap = () => {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
+    if (newCount >= 5) {
+      toggleAdminAuth();
+    }
+  };
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
   
@@ -110,7 +155,8 @@ const App: React.FC = () => {
               isAdminMode={isAdminMode} 
               theme={theme} 
               toggleTheme={toggleTheme} 
-              onLogout={handleLogout} 
+              onLogout={handleLogout}
+              onSecretTap={handleSecretTap}
             />
           ) : (
             <Navigate to="/login" />
