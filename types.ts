@@ -1,10 +1,12 @@
+
 export interface CaseFile {
   id: string;
   name: string;
   dni: string;
   location: string;
   details: string;
-  status: 'Active' | 'Closed' | 'Pending'; // Active = Público, Pending = Requiere Aprobación
+  socials?: string; // Nuevo campo: Redes Sociales / Enlaces
+  status: 'Active' | 'Closed' | 'Pending';
   dateAdded: string;
 }
 
