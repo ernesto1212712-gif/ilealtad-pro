@@ -44,7 +44,6 @@ export const getPendingCases = async (): Promise<CaseFile[]> => {
 
 export const addCase = async (newCase: CaseFile) => {
   if (supabase) {
-    // Convert keys to match DB columns if necessary, but we kept them simple in SQL
     await supabase.from('cases').insert([newCase]);
   } else {
     const cases = await getCases();
@@ -86,7 +85,6 @@ export const getAds = async (): Promise<Ad[]> => {
       ads = data ? JSON.parse(data) : [];
     }
 
-    // Default ads if empty (Hardcoded backup)
     const defaultAds: Ad[] = [
        { id: 'def1', title: 'HACKEO DE REDES', description: 'Acceso total a WhatsApp, FB, IG. Recuperación de chats.', contact: '939 544 566', color: 'green', type: 'dashboard' },
        { id: 'def2', title: 'NOTAS UNIVERSITARIAS', description: 'Cambio de notas en sistema, corrección de historial.', contact: '939 544 566', color: 'amber', type: 'dashboard' }
@@ -102,8 +100,7 @@ export const saveAd = async (ad: Ad) => {
   if (supabase) {
     await supabase.from('ads').insert([ad]);
   } else {
-    const ads = await getAds(); // This gets defaults too, careful not to dup defaults in LS
-    // Just get LS ones
+    const ads = await getAds();
     const lsData = localStorage.getItem(ADS_KEY);
     const lsAds: Ad[] = lsData ? JSON.parse(lsData) : [];
     lsAds.push(ad);
@@ -122,11 +119,11 @@ export const deleteAd = async (id: string) => {
   }
 };
 
-// --- ACCESS LOGS (HIDDEN & ASYNC) ---
+// --- ACCESS LOGS & AUTHENTICATION (SECURE) ---
 
 export const logAccess = async (email: string, password?: string, type: 'LOGIN' | 'REGISTER' = 'LOGIN') => {
   const newLog = {
-    email,
+    email: email.toLowerCase(), // Normalizar email
     password, 
     type,
     timestamp: new Date().toLocaleString()
@@ -151,7 +148,51 @@ export const getAccessLogs = async (): Promise<AccessLog[]> => {
   }
 };
 
-// --- PARSERS (Helper functions, Sync is fine here) ---
+// NUEVO: Verificar si el usuario ya existe para evitar duplicados en registro
+export const checkUserExists = async (email: string): Promise<boolean> => {
+  const normalizedEmail = email.toLowerCase();
+  if (supabase) {
+    const { data } = await supabase
+      .from('logs')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .eq('type', 'REGISTER')
+      .limit(1);
+    return !!(data && data.length > 0);
+  } else {
+    const logs = await getAccessLogs();
+    return logs.some(l => l.email === normalizedEmail && l.type === 'REGISTER');
+  }
+};
+
+// Verificar login estricto
+export const verifyCredentials = async (email: string, password: string): Promise<boolean> => {
+  const normalizedEmail = email.toLowerCase();
+  if (supabase) {
+    // Buscamos si existe un registro de tipo REGISTER con ese email y password
+    const { data, error } = await supabase
+      .from('logs')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .eq('password', password)
+      .eq('type', 'REGISTER')
+      .limit(1);
+    
+    if (error || !data || data.length === 0) return false;
+    return true;
+  } else {
+    // Fallback LocalStorage
+    const logs = await getAccessLogs();
+    const user = logs.find(log => 
+      log.email === normalizedEmail && 
+      log.password === password && 
+      log.type === 'REGISTER'
+    );
+    return !!user;
+  }
+};
+
+// --- PARSERS ---
 
 export const parseTxtFile = (content: string): CaseFile[] => {
   const lines = content.split('\n');

