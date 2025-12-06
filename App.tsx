@@ -10,11 +10,13 @@ import SubmitCase from './pages/SubmitCase';
 import Moderation from './pages/Moderation';
 import ManageAds from './pages/ManageAds';
 import Sidebar from './components/Sidebar';
+import { Menu } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Estado para menú móvil
 
   useEffect(() => {
     // Check Auth
@@ -55,6 +57,7 @@ const App: React.FC = () => {
     localStorage.removeItem('ilealtad_auth');
     setIsAuthenticated(false);
     setIsAdminMode(false);
+    setIsSidebarOpen(false);
   };
 
   if (!isAuthenticated) {
@@ -64,34 +67,52 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300">
+        
+        {/* Sidebar con control de estado */}
         <Sidebar 
           onLogout={handleLogout} 
           isAdminMode={isAdminMode} 
           theme={theme} 
-          toggleTheme={toggleTheme} 
+          toggleTheme={toggleTheme}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
         
-        <div className="flex-1 ml-64 overflow-y-auto">
+        {/* Main Content - Ajuste de margen izquierdo solo en escritorio (md:ml-64) */}
+        <div className="flex-1 md:ml-64 w-full overflow-y-auto h-screen flex flex-col">
+          
           {/* Top Header */}
-          <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 flex items-center justify-between px-8 transition-colors">
-            <h2 className="font-semibold text-slate-700 dark:text-slate-200">
-              {isAdminMode ? <span className="text-red-600 font-bold tracking-wider">[ MODO ROOT / GOD MODE ]</span> : 'Panel Empresarial'}
-            </h2>
+          <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 flex items-center justify-between px-4 md:px-8 transition-colors shrink-0">
+            
             <div className="flex items-center gap-4">
-              <span className="text-sm text-slate-500 dark:text-slate-400">Sistema Seguro v12.0</span>
+              {/* Botón Hamburguesa (Solo Móvil) */}
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="md:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <Menu size={24} />
+              </button>
+
+              <h2 className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[200px] md:max-w-none">
+                {isAdminMode ? <span className="text-red-600 font-bold tracking-wider text-xs md:text-base">[ ROOT MODE ]</span> : 'Panel Empresarial'}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-3 md:gap-4">
+              <span className="hidden md:inline text-sm text-slate-500 dark:text-slate-400">Sistema Seguro v12.0</span>
               <div className={`w-2 h-2 rounded-full ${isAdminMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
             </div>
           </header>
 
           {/* Main Content Area */}
-          <main className="p-4">
+          <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/submit-case" element={<SubmitCase />} />
               <Route path="/database" element={<DatabasePage />} />
               
-              {/* Rutas Ocultas Protegidas visualmente */}
+              {/* Rutas Ocultas */}
               {isAdminMode && (
                 <>
                   <Route path="/upload" element={<UploadPage />} />
